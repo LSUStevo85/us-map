@@ -177,7 +177,7 @@
     setDbg('Loading US states…');
     let topo;
     try {
-      const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json');
+      const res = await fetch('./states-10m.json', { cache: 'no-store' });
       topo = await res.json();
     } catch (e) {
       setDbg('Error: Failed to fetch states data (network/CDN blocked).');
@@ -224,3 +224,4 @@
   </script>
 </body>
 </html>
+
