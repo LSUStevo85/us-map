@@ -175,14 +175,46 @@
     }
 
     setDbg('Loading US states…');
-    let topo;
-    try {
-      const res = await fetch('./states-10m.json', { cache: 'no-store' });
-      topo = await res.json();
-    } catch (e) {
-      setDbg('Error: Failed to fetch states data (network/CDN blocked).');
-      return;
-    }
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Fetch timed out')), ms)
+    )
+  ]);
+}
+
+let topo;
+try {
+  // Use an absolute URL based on the current page (removes path ambiguity)
+  const url = new URL('states-10m.json', window.location.href).toString();
+
+  const res = await withTimeout(fetch(url, { cache: 'no-store' }), 12000);
+
+  // Show status immediately
+  setDbg(`Loading US states… (HTTP ${res.status})`);
+
+  if (!res.ok) {
+    const t = await res.text();
+    setDbg(`Fetch failed: HTTP ${res.status}. URL: ${res.url}. First bytes: ${t.slice(0, 120)}`);
+    return;
+  }
+
+  // Sometimes GitHub will return HTML (like a 404 page) with 200 depending on path
+  const contentType = res.headers.get('content-type') || '';
+  const text = await res.text();
+
+  if (!text.trim().startsWith('{')) {
+    setDbg(`Not JSON. content-type=${contentType}. URL: ${res.url}. First bytes: ${text.slice(0, 160)}`);
+    return;
+  }
+
+  topo = JSON.parse(text);
+} catch (e) {
+  setDbg(`Error fetching states: ${e.message}`);
+  return;
+}
 
     const allStates = topojson.feature(topo, topo.objects.states).features;
     const filtered = allStates.filter(f => !EXCLUDED.has(fips2(f.id)));
@@ -224,4 +256,5 @@
   </script>
 </body>
 </html>
+
 
